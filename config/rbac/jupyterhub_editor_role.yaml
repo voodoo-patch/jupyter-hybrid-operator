@@ -1,0 +1,24 @@
+# permissions for end users to edit jupyterhubs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jupyterhub-editor-role
+rules:
+- apiGroups:
+  - charts.edu.unito.it
+  resources:
+  - jupyterhubs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - charts.edu.unito.it
+  resources:
+  - jupyterhubs/status
+  verbs:
+  - get

@@ -1,0 +1,20 @@
+# permissions for end users to view jupyterhubs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jupyterhub-viewer-role
+rules:
+- apiGroups:
+  - charts.edu.unito.it
+  resources:
+  - jupyterhubs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - charts.edu.unito.it
+  resources:
+  - jupyterhubs/status
+  verbs:
+  - get

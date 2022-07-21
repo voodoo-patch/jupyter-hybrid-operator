@@ -1,13 +1,13 @@
-# permissions for end users to view jupyterhubs.
+# permissions for end users to view dossiers.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: jupyterhub-viewer-role
+  name: dossier-viewer-role
 rules:
 - apiGroups:
   - streamflow.edu.unito.it
   resources:
-  - jupyterhubs
+  - dossiers
   verbs:
   - get
   - list
@@ -15,6 +15,6 @@ rules:
 - apiGroups:
   - streamflow.edu.unito.it
   resources:
-  - jupyterhubs/status
+  - dossiers/status
   verbs:
   - get

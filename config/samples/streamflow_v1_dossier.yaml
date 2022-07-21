@@ -1,0 +1,6 @@
+apiVersion: streamflow.edu.unito.it/v1
+kind: Dossier
+metadata:
+  name: dossier-sample
+spec:
+  # TODO(user): Add fields here

@@ -29,10 +29,10 @@ rules:
   - create
 
 ##
-## Rules for charts.edu.unito.it/v1alpha1, Kind: Jupyterhub
+## Rules for streamflow.edu.unito.it/v1alpha1, Kind: Jupyterhub
 ##
 - apiGroups:
-  - charts.edu.unito.it
+  - streamflow.edu.unito.it
   resources:
   - jupyterhubs
   - jupyterhubs/status
@@ -52,6 +52,18 @@ rules:
   resources:
   - "clusterrolebindings"
   - "clusterroles"
+- verbs:
+  - "*"
+  apiGroups:
+  - "networking.k8s.io"
+  resources:
+  - "networkpolicies"
+- verbs:
+  - "*"
+  apiGroups:
+  - "policy"
+  resources:
+  - "poddisruptionbudgets"
 - verbs:
   - "*"
   apiGroups:
@@ -77,17 +89,5 @@ rules:
   - "daemonsets"
   - "deployments"
   - "statefulsets"
-- verbs:
-  - "*"
-  apiGroups:
-  - "networking.k8s.io"
-  resources:
-  - "networkpolicies"
-- verbs:
-  - "*"
-  apiGroups:
-  - "policy"
-  resources:
-  - "poddisruptionbudgets"
 
 #+kubebuilder:scaffold:rules

@@ -1,4 +1,4 @@
-apiVersion: charts.edu.unito.it/v1alpha1
+apiVersion: streamflow.edu.unito.it/v1alpha1
 kind: Jupyterhub
 metadata:
   name: jupyterhub-sample

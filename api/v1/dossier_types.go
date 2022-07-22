@@ -18,6 +18,8 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -30,6 +32,12 @@ type DossierSpec struct {
 
 	// Foo is an example field of Dossier. Edit dossier_types.go to remove/update
 	Foo string `json:"foo,omitempty"`
+
+	// Jhub is a generic object that should reflect jupyterhub values schema
+	Jhub *apiextv1.JSON `json:"jhub,omitempty" yaml:"jhub,omitempty"`
+
+	// Postgres is a generic object that should reflect postgres values schema
+	Postgres *apiextv1.JSON `json:"postgres,omitempty" yaml:"postgres,omitempty"`
 }
 
 // DossierStatus defines the observed state of Dossier

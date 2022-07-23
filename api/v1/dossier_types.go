@@ -44,6 +44,12 @@ type DossierSpec struct {
 type DossierStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	
+	// JhubNodes are the names of the jhub pods
+	JhubNodes []string `json:"jhub-nodes"`
+	
+	// JhubNodes are the names of the postgres pods
+	PostgresNodes []string `json:"postgres-nodes"`
 }
 
 //+kubebuilder:object:root=true

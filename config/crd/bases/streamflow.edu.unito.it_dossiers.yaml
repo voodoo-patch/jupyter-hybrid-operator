@@ -50,6 +50,20 @@ spec:
             type: object
           status:
             description: DossierStatus defines the observed state of Dossier
+            properties:
+              jhub-nodes:
+                description: JhubNodes are the names of the jhub pods
+                items:
+                  type: string
+                type: array
+              postgres-nodes:
+                description: JhubNodes are the names of the postgres pods
+                items:
+                  type: string
+                type: array
+            required:
+            - jhub-nodes
+            - postgres-nodes
             type: object
         type: object
     served: true

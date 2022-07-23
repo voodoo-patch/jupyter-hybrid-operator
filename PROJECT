@@ -23,4 +23,11 @@ resources:
   kind: Dossier
   path: github.com/voodoo-patch/jupyter-hybrid-operator/api/v1
   version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: edu.unito.it
+  group: streamflow
+  kind: Postgresql
+  version: v1alpha1
 version: "3"

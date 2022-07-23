@@ -2,4 +2,5 @@
 resources:
 - streamflow_v1alpha1_jupyterhub.yaml
 - streamflow_v1_dossier.yaml
+- streamflow_v1alpha1_postgresql.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

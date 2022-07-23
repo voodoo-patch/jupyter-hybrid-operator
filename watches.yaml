@@ -3,4 +3,8 @@
   version: v1alpha1
   kind: Jupyterhub
   chart: helm-charts/jupyterhub
+- group: streamflow.edu.unito.it
+  version: v1alpha1
+  kind: Postgresql
+  chart: helm-charts/postgresql
 #+kubebuilder:scaffold:watch

@@ -18,11 +18,17 @@ package controllers
 
 import (
 	"context"
-
+	"fmt"
+	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	// "sigs.k8s.io/controller-runtime/pkg/log"
 
 	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
 )
@@ -30,6 +36,7 @@ import (
 // DossierReconciler reconciles a Dossier object
 type DossierReconciler struct {
 	client.Client
+	Log    logr.Logger
 	Scheme *runtime.Scheme
 }
 
@@ -50,8 +57,102 @@ func (r *DossierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	_ = log.FromContext(ctx)
 
 	// TODO(user): your logic here
+	log := r.Log.WithValues("dossier", req.NamespacedName)
 
-	return ctrl.Result{}, nil
+	// Fetch the Dossier instance
+	dossier := &streamflowv1.Dossier{}
+	err := r.Get(ctx, req.NamespacedName, dossier)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Request object not existingDeployment, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			// Return and don't requeue
+			log.Info("Dossier resource not existingDeployment. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		log.Error(err, "Failed to get Dossier")
+		return ctrl.Result{}, err
+	}
+
+	// Define a new jhub resource
+	jhub := getJhubCustomResource(dossier, false)
+	err = r.Get(ctx, client.ObjectKeyFromObject(jhub), jhub)
+	if err != nil && errors.IsNotFound(err) {
+		jhub = getJhubCustomResource(dossier, true)
+		r.logCreatingCR(log, jhub)
+		err = r.Create(ctx, jhub)
+		if err != nil {
+			r.logFailCR(log, err, jhub)
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Define a new postgres resource
+	postgres := getPostgresCustomResource(dossier, false)
+	err = r.Get(ctx, client.ObjectKeyFromObject(postgres), postgres)
+	if err != nil && errors.IsNotFound(err) {
+		postgres = getPostgresCustomResource(dossier, true)
+		r.logCreatingCR(log, postgres)
+		err = r.Create(ctx, postgres)
+		if err != nil {
+			r.logFailCR(log, err, postgres)
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Resources created successfully - return and requeue
+	return ctrl.Result{Requeue: true}, nil
+}
+
+func (r *DossierReconciler) logFailCR(log logr.Logger, err error, cr *unstructured.Unstructured) {
+	kind := cr.GetKind()
+	log.Error(err, fmt.Sprintf("Failed to create new %s", kind), fmt.Sprintf("%s.Namespace", kind), cr.GetNamespace(), fmt.Sprintf("%s.Name", kind), cr.GetName())
+}
+
+func (r *DossierReconciler) logCreatingCR(log logr.Logger, cr *unstructured.Unstructured) {
+	kind := cr.GetKind()
+	log.Info(fmt.Sprintf("Creating a new %s", kind), fmt.Sprintf("%s.Namespace", kind), cr.GetNamespace(), fmt.Sprintf("%s.Name", kind), cr.GetName())
+}
+
+func getJhubCustomResource(d *streamflowv1.Dossier, withSpec bool) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	if withSpec {
+		jhub := d.Spec.Jhub
+		delete(jhub.Object, "kind")
+		u.SetUnstructuredContent(map[string]interface{}{
+			"spec": d.Spec.Jhub.Object,
+		})
+	}
+	u.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   streamflowv1.GroupVersion.Group,
+		Kind:    "Jupyterhub",
+		Version: "v1alpha1",
+	})
+	u.SetName(d.Name + "-jhub")
+	u.SetNamespace(d.Namespace)
+
+	return u
+}
+
+func getPostgresCustomResource(d *streamflowv1.Dossier, withSpec bool) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	if withSpec {
+		postgres := d.Spec.Postgres
+		delete(postgres.Object, "kind")
+		u.SetUnstructuredContent(map[string]interface{}{
+			"spec": postgres.Object,
+		})
+	}
+	u.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   streamflowv1.GroupVersion.Group,
+		Kind:    "Postgresql",
+		Version: "v1alpha1",
+	})
+	u.SetName(d.Name + "-postgres")
+	u.SetNamespace(d.Namespace)
+
+	return u
 }
 
 // SetupWithManager sets up the controller with the Manager.

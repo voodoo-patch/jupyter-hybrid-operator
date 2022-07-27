@@ -42,10 +42,12 @@ spec:
               jhub:
                 description: Jhub is a generic object that should reflect jupyterhub
                   values schema
+                type: object
                 x-kubernetes-preserve-unknown-fields: true
               postgres:
                 description: Postgres is a generic object that should reflect postgres
                   values schema
+                type: object
                 x-kubernetes-preserve-unknown-fields: true
             type: object
           status:

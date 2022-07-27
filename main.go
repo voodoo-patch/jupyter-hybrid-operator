@@ -34,6 +34,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
 	"github.com/voodoo-patch/jupyter-hybrid-operator/controllers"
@@ -61,6 +62,7 @@ func main() {
 		watchesPath          string
 		probeAddr            string
 		enableLeaderElection bool
+		err                  error
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -78,6 +80,31 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	mgr := createManager(metricsAddr, probeAddr, enableLeaderElection, leaderElectionID)
+
+	setupDossierReconciler(err, mgr)
+
+	//+kubebuilder:scaffold:builder
+
+	addChecks(mgr)
+
+	setupHelmChartsReconcilers(watchesPath, mgr)
+
+	startManager(mgr)
+}
+
+func addChecks(mgr manager.Manager) {
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+}
+
+func createManager(metricsAddr string, probeAddr string, enableLeaderElection bool, leaderElectionID string) manager.Manager {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -91,24 +118,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	return mgr
+}
+
+func setupDossierReconciler(err error, mgr manager.Manager) {
 	if err = (&controllers.DossierReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Log:    ctrl.Log.WithName("controllers").WithName("Dossier"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Dossier")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+}
 
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
-	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
-	}
-
+func setupHelmChartsReconcilers(watchesPath string, mgr manager.Manager) {
 	ws, err := watches.Load(watchesPath)
 	if err != nil {
 		setupLog.Error(err, "Failed to create new manager factories")
@@ -116,7 +140,7 @@ func main() {
 	}
 
 	for _, w := range ws {
-		// Register controller with the factory
+
 		reconcilePeriod := defaultReconcilePeriod
 		if w.ReconcilePeriod != nil {
 			reconcilePeriod = w.ReconcilePeriod.Duration
@@ -148,7 +172,9 @@ func main() {
 		}
 		setupLog.Info("configured watch", "gvk", w.GroupVersionKind, "chartPath", w.ChartPath, "maxConcurrentReconciles", maxConcurrentReconciles, "reconcilePeriod", reconcilePeriod)
 	}
+}
 
+func startManager(mgr manager.Manager) {
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")

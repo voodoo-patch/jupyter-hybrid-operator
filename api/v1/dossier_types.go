@@ -18,8 +18,7 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -34,20 +33,22 @@ type DossierSpec struct {
 	Foo string `json:"foo,omitempty"`
 
 	// Jhub is a generic object that should reflect jupyterhub values schema
-	Jhub *apiextv1.JSON `json:"jhub,omitempty" yaml:"jhub,omitempty"`
+	//+kubebuilder:pruning:PreserveUnknownFields
+	Jhub unstructured.Unstructured `json:"jhub,omitempty" yaml:"jhub,omitempty"`
 
 	// Postgres is a generic object that should reflect postgres values schema
-	Postgres *apiextv1.JSON `json:"postgres,omitempty" yaml:"postgres,omitempty"`
+	//+kubebuilder:pruning:PreserveUnknownFields
+	Postgres unstructured.Unstructured `json:"postgres,omitempty" yaml:"postgres,omitempty"`
 }
 
 // DossierStatus defines the observed state of Dossier
 type DossierStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	
+
 	// JhubNodes are the names of the jhub pods
 	JhubNodes []string `json:"jhub-nodes"`
-	
+
 	// JhubNodes are the names of the postgres pods
 	PostgresNodes []string `json:"postgres-nodes"`
 }

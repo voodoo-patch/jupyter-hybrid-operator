@@ -29,9 +29,6 @@ type DossierSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Dossier. Edit dossier_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
-
 	// Jhub is a generic object that should reflect jupyterhub values schema
 	//+kubebuilder:pruning:PreserveUnknownFields
 	Jhub unstructured.Unstructured `json:"jhub,omitempty" yaml:"jhub,omitempty"`
@@ -51,6 +48,9 @@ type DossierStatus struct {
 
 	// JhubNodes are the names of the postgres pods
 	PostgresNodes []string `json:"postgres-nodes"`
+
+	// Conditions represent the latest available observations of an object's state
+	Conditions []metav1.Condition `json:"conditions"`
 }
 
 //+kubebuilder:object:root=true

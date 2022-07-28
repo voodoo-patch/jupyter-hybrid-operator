@@ -26,12 +26,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	// "sigs.k8s.io/controller-runtime/pkg/log"
 
 	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
 )
+
+var dossierFinalizer = streamflowv1.GroupVersion.Group + "/finalizer"
 
 // DossierReconciler reconciles a Dossier object
 type DossierReconciler struct {
@@ -54,11 +57,10 @@ type DossierReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.2/pkg/reconcile
 func (r *DossierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	var result ctrl.Result
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
 	log := r.Log.WithValues("dossier", req.NamespacedName)
-
 	// Fetch the Dossier instance
 	dossier := &streamflowv1.Dossier{}
 	err := r.Get(ctx, req.NamespacedName, dossier)
@@ -75,11 +77,90 @@ func (r *DossierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	isDossierMarkedToBeDeleted := dossier.GetDeletionTimestamp() != nil
+	if isDossierMarkedToBeDeleted {
+		return r.handleDeletion(ctx, dossier, log)
+	}
+
+	// Add finalizer for this CR
+	result, err = r.addFinalizer(ctx, dossier)
+	if err != nil {
+		return result, err
+	}
+
 	// Define a new jhub resource
+	result, err = r.createJhubIfNotExists(ctx, dossier, log)
+	if err != nil {
+		return result, err
+	}
+
+	// Define a new postgres resource
+	result, err = r.createPostgresIfNotExists(ctx, dossier, log)
+	if err != nil {
+		return result, err
+	}
+
+	// Resources created successfully - return and requeue
+	return ctrl.Result{Requeue: true}, nil
+}
+
+func (r *DossierReconciler) addFinalizer(ctx context.Context, dossier *streamflowv1.Dossier) (ctrl.Result, error) {
+	if !controllerutil.ContainsFinalizer(dossier, dossierFinalizer) {
+		controllerutil.AddFinalizer(dossier, dossierFinalizer)
+		err := r.Update(ctx, dossier)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *DossierReconciler) handleDeletion(ctx context.Context, dossier *streamflowv1.Dossier, log logr.Logger) (ctrl.Result, error) {
+	if controllerutil.ContainsFinalizer(dossier, dossierFinalizer) {
+		// Run finalization logic for dossierFinalizer. If the
+		// finalization logic fails, don't remove the finalizer so
+		// that we can retry during the next reconciliation.
+		if err := r.finalizeDossier(ctx, log, dossier); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		// Remove dossierFinalizer. Once all finalizers have been
+		// removed, the object will be deleted.
+		controllerutil.RemoveFinalizer(dossier, dossierFinalizer)
+		err := r.Update(ctx, dossier)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *DossierReconciler) finalizeDossier(ctx context.Context, log logr.Logger, dossier *streamflowv1.Dossier) error {
+	// delete jhub
+	jhub := getJhubCustomResource(dossier, true)
+	err := r.Client.Delete(ctx, jhub)
+	if err != nil {
+		return err
+	}
+
+	// delete postgres
+	postgres := getPostgresCustomResource(dossier, true)
+	err = r.Client.Delete(ctx, postgres)
+	if err != nil {
+		return err
+	}
+
+	log.Info("Successfully finalized dossier")
+
+	return nil
+}
+
+func (r *DossierReconciler) createJhubIfNotExists(ctx context.Context, dossier *streamflowv1.Dossier, log logr.Logger) (ctrl.Result, error) {
 	jhub := getJhubCustomResource(dossier, false)
-	err = r.Get(ctx, client.ObjectKeyFromObject(jhub), jhub)
+	err := r.Get(ctx, client.ObjectKeyFromObject(jhub), jhub)
 	if err != nil && errors.IsNotFound(err) {
 		jhub = getJhubCustomResource(dossier, true)
+		ctrl.SetControllerReference(dossier, jhub, r.Scheme)
 		r.logCreatingCR(log, jhub)
 		err = r.Create(ctx, jhub)
 		if err != nil {
@@ -87,12 +168,15 @@ func (r *DossierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 	}
+	return ctrl.Result{}, nil
+}
 
-	// Define a new postgres resource
+func (r *DossierReconciler) createPostgresIfNotExists(ctx context.Context, dossier *streamflowv1.Dossier, log logr.Logger) (ctrl.Result, error) {
 	postgres := getPostgresCustomResource(dossier, false)
-	err = r.Get(ctx, client.ObjectKeyFromObject(postgres), postgres)
+	err := r.Get(ctx, client.ObjectKeyFromObject(postgres), postgres)
 	if err != nil && errors.IsNotFound(err) {
 		postgres = getPostgresCustomResource(dossier, true)
+		ctrl.SetControllerReference(dossier, postgres, r.Scheme)
 		r.logCreatingCR(log, postgres)
 		err = r.Create(ctx, postgres)
 		if err != nil {
@@ -100,9 +184,7 @@ func (r *DossierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 	}
-
-	// Resources created successfully - return and requeue
-	return ctrl.Result{Requeue: true}, nil
+	return ctrl.Result{}, nil
 }
 
 func (r *DossierReconciler) logFailCR(log logr.Logger, err error, cr *unstructured.Unstructured) {

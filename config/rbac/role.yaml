@@ -9,8 +9,6 @@ rules:
   - streamflow.edu.unito.it
   resources:
   - dossiers
-  - jupyterhubs
-  - postgresqls
   verbs:
   - create
   - delete
@@ -26,9 +24,36 @@ rules:
   verbs:
   - update
 - apiGroups:
-    - ""
+  - streamflow.edu.unito.it
   resources:
-    - secrets
+  - dossiers/status
   verbs:
-    - get
-    - list
+  - get
+  - patch
+  - update
+- apiGroups:
+  - streamflow.edu.unito.it
+  resources:
+  - postgresusers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - streamflow.edu.unito.it
+  resources:
+  - postgresusers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - streamflow.edu.unito.it
+  resources:
+  - postgresusers/status
+  verbs:
+  - get
+  - patch
+  - update

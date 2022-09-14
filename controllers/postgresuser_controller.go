@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"database/sql"
+	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -28,6 +30,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
+
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
+	"github.com/uptrace/bun/extra/bundebug"
 )
 
 var finalizer = streamflowv1.GroupVersion.Group + "/finalizer"
@@ -85,7 +92,57 @@ func (r *PostgresUserReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return result, err
 	}
 
+	db := connectToDb()
+	exists, err := findUser(ctx, db, dbUser.Spec.Username)
+	if err != nil {
+		log.Error(err, "Error while retrieving user from db")
+	}
+	if !exists {
+		addUser()
+	}
+
 	return ctrl.Result{}, nil
+}
+
+func connectToDb() *bun.DB {
+	dsn := "postgres://postgres:@localhost:5432/test?sslmode=disable"
+	// dsn := "unix://user:pass@dbname/var/run/postgresql/.s.PGSQL.5432"
+	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
+
+	db := bun.NewDB(sqldb, pgdialect.New())
+
+	db.AddQueryHook(bundebug.NewQueryHook(
+		bundebug.WithVerbose(true),
+		bundebug.FromEnv("BUNDEBUG"),
+	))
+
+	return db
+}
+
+func findUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) (bool, error) {
+	return db.
+		NewSelect().
+		TableExpr("users").
+		Where("name = ?", dbUser.Spec.Username).
+		Exists(ctx)
+}
+
+func addUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) {
+	db.NewInsert().ColumnExpr()
+}
+
+func deleteUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) {
+	db.NewDelete().ColumnExpr()
+}
+
+type User struct {
+	bun.BaseModel `bun:"table:users,alias:u"`
+
+	ID           int64     `bun:"id,pk"`
+	Name         string    `bun:"name,notnull"`
+	Admin        bool      `bun:"admin,notnull"`
+	Created      date.Date `bun:"created,notnull"`
+	LastActivity date.Date `bun:"last_activity,notnull"`
 }
 
 func (r *PostgresUserReconciler) addFinalizer(ctx context.Context, dbUser *streamflowv1.PostgresUser) (ctrl.Result, error) {

@@ -69,7 +69,7 @@ func (r *DossierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// Request object not existingDeployment, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			log.Info("Dossier resource not existingDeployment. Ignoring since object must be deleted")
+			log.Info("Dossier resource not existing. Ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
@@ -167,6 +167,11 @@ func (r *DossierReconciler) createJhubIfNotExists(ctx context.Context, dossier *
 			r.logFailCR(log, err, jhub)
 			return ctrl.Result{}, err
 		}
+		dossier.Status.JhubCR = jhub.GetName()
+		err := r.Update(ctx, dossier)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 	return ctrl.Result{}, nil
 }
@@ -181,6 +186,11 @@ func (r *DossierReconciler) createPostgresIfNotExists(ctx context.Context, dossi
 		err = r.Create(ctx, postgres)
 		if err != nil {
 			r.logFailCR(log, err, postgres)
+			return ctrl.Result{}, err
+		}
+		dossier.Status.PostgresCR = postgres.GetName()
+		err := r.Update(ctx, dossier)
+		if err != nil {
 			return ctrl.Result{}, err
 		}
 	}

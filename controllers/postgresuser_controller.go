@@ -21,15 +21,15 @@ import (
 	"database/sql"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/go-logr/logr"
+	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"regexp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -38,12 +38,24 @@ import (
 )
 
 var finalizer = streamflowv1.GroupVersion.Group + "/finalizer"
+var logger logr.Logger
+var dsnProtocolRegex = regexp.MustCompile(`^(postgresql)([^:]*)`)
 
 // PostgresUserReconciler reconciles a PostgresUser object
 type PostgresUserReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
+}
+
+type User struct {
+	bun.BaseModel `bun:"table:users,alias:u"`
+
+	ID           int64     `bun:"id,pk"`
+	Name         string    `bun:"name,notnull"`
+	Admin        bool      `bun:"admin,notnull"`
+	Created      date.Date `bun:"created,notnull"`
+	LastActivity date.Date `bun:"last_activity,notnull"`
 }
 
 //+kubebuilder:rbac:groups=streamflow.edu.unito.it,resources=postgresusers,verbs=get;list;watch;create;update;patch;delete
@@ -63,27 +75,27 @@ func (r *PostgresUserReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	var result ctrl.Result
 	_ = log.FromContext(ctx)
 
-	log := r.Log.WithValues("postgresUser", req.NamespacedName)
+	logger := r.Log.WithValues("postgresUser", req.NamespacedName)
 
 	// Fetch the PostgresUser instance
 	dbUser := &streamflowv1.PostgresUser{}
 	err := r.Get(ctx, req.NamespacedName, dbUser)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Request object not existingDeployment, could have been deleted after reconcile request.
+			// Request object not existing, could have been deleted after reconcile request.
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
-			log.Info("PostgresUser resource not existing Deployment. Ignoring since object must be deleted")
+			logger.Info("PostgresUser resource not existing. Ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get PostgresUser")
+		logger.Error(err, "Failed to get PostgresUser")
 		return ctrl.Result{}, err
 	}
 
 	isUserMarkedToBeDeleted := dbUser.GetDeletionTimestamp() != nil
 	if isUserMarkedToBeDeleted {
-		return r.handleDeletion(ctx, dbUser, log)
+		return r.handleDeletion(ctx, dbUser, logger)
 	}
 
 	// Add finalizer for this CR
@@ -92,57 +104,99 @@ func (r *PostgresUserReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return result, err
 	}
 
-	db := connectToDb()
-	exists, err := findUser(ctx, db, dbUser.Spec.Username)
+	err = r.addUserIfNotExists(ctx, dbUser)
 	if err != nil {
-		log.Error(err, "Error while retrieving user from db")
-	}
-	if !exists {
-		addUser()
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func connectToDb() *bun.DB {
-	dsn := "postgres://postgres:@localhost:5432/test?sslmode=disable"
-	// dsn := "unix://user:pass@dbname/var/run/postgresql/.s.PGSQL.5432"
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
+func (r *PostgresUserReconciler) addUserIfNotExists(ctx context.Context, dbUser *streamflowv1.PostgresUser) error {
+	db, err := r.connectToDb(ctx, types.NamespacedName{dbUser.Spec.Dossier, dbUser.Namespace})
+	if err != nil {
+		logger.Error(err, "Unable to establish a connection to the database")
+		return err
+	}
+	existingUser, err := getUser(ctx, db, dbUser)
+	if err != nil {
+		logger.Error(err, "Error while retrieving user from db")
+		return err
+	}
+	if existingUser == nil {
+		err = addUser(ctx, db, dbUser)
+	} else if existingUser.Admin != dbUser.Spec.IsAdmin {
+		err = deleteUser(ctx, db, dbUser)
+		if err != nil {
+			return err
+		}
+		err = addUser(ctx, db, dbUser)
+	}
+	return err
+}
 
+func (r *PostgresUserReconciler) connectToDb(ctx context.Context, dossierName types.NamespacedName) (*bun.DB, error) {
+	dossier := &streamflowv1.Dossier{}
+	err := r.Get(ctx, dossierName, dossier)
+	if err != nil {
+		logger.Error(err, "Failed to get Dossier named: "+dossierName.String())
+		return nil, err
+	}
+	connectionString := dossier.Spec.Jhub.UnstructuredContent()["hub.db.url"].(string)
+	password := dossier.Spec.Jhub.UnstructuredContent()["hub.db.password"].(string)
+
+	sqldb := sql.OpenDB(pgdriver.NewConnector(
+		pgdriver.WithDSN(sanitizeDsn(connectionString)),
+		pgdriver.WithPassword(password)))
 	db := bun.NewDB(sqldb, pgdialect.New())
-
 	db.AddQueryHook(bundebug.NewQueryHook(
 		bundebug.WithVerbose(true),
 		bundebug.FromEnv("BUNDEBUG"),
 	))
 
-	return db
+	return db, nil
 }
 
-func findUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) (bool, error) {
-	return db.
+func sanitizeDsn(dsn string) string {
+	return dsnProtocolRegex.ReplaceAllString(dsn, "$1")
+}
+
+func getUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) (*User, error) {
+	user := &User{}
+	err := db.
 		NewSelect().
+		Model(user).
 		TableExpr("users").
 		Where("name = ?", dbUser.Spec.Username).
-		Exists(ctx)
+		Limit(1).
+		Scan(ctx)
+	return user, err
 }
 
-func addUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) {
-	db.NewInsert().ColumnExpr()
+func addUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) error {
+	user := &User{
+		Name:         dbUser.Spec.Username,
+		Admin:        dbUser.Spec.IsAdmin,
+		Created:      date.Date{},
+		LastActivity: date.Date{},
+	}
+	_, err := db.NewInsert().
+		Model(user).
+		Exec(ctx)
+	if err != nil {
+		logger.Error(err, "Error while adding user to db")
+	}
+	return err
 }
 
-func deleteUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) {
-	db.NewDelete().ColumnExpr()
-}
-
-type User struct {
-	bun.BaseModel `bun:"table:users,alias:u"`
-
-	ID           int64     `bun:"id,pk"`
-	Name         string    `bun:"name,notnull"`
-	Admin        bool      `bun:"admin,notnull"`
-	Created      date.Date `bun:"created,notnull"`
-	LastActivity date.Date `bun:"last_activity,notnull"`
+func deleteUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) error {
+	_, err := db.NewDelete().
+		Where("name = ?", dbUser.Spec.Username).
+		Exec(ctx)
+	if err != nil {
+		logger.Error(err, "Error while deleting user from db")
+	}
+	return err
 }
 
 func (r *PostgresUserReconciler) addFinalizer(ctx context.Context, dbUser *streamflowv1.PostgresUser) (ctrl.Result, error) {

@@ -38,25 +38,24 @@ type DossierSpec struct {
 	Postgres unstructured.Unstructured `json:"postgres,omitempty" yaml:"postgres,omitempty"`
 }
 
-// DossierStatus defines the observed state of Dossier
+// JupyterhubStatus defines the observed state of Dossier
 type DossierStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// JhubNodes are the names of the jhub pods
-	JhubNodes []string `json:"jhub-nodes"`
+	// JhubCR is the name of the created jupyterhub custom resource
+	JhubCR string `json:"jhub-cr,omitempty" yaml:"jhub-cr,omitempty"`
 
-	// JhubNodes are the names of the postgres pods
-	PostgresNodes []string `json:"postgres-nodes"`
+	// PostgresCR is the name of the created postgres custom resource
+	PostgresCR string `json:"postgres-cr,omitempty" yaml:"postgres-cr,omitempty"`
 
 	// Conditions represent the latest available observations of an object's state
 	Conditions []metav1.Condition `json:"conditions"`
 }
 
+// Dossier is the Schema for the dossiers API
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-
-// Dossier is the Schema for the dossiers API
 type Dossier struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

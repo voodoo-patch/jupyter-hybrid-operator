@@ -104,6 +104,11 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="" paths="./..."
 
+scaffold: schematyper
+	schematyper --package v1 -o api/v1/jupyterhub_types.go helm-charts/jupyterhub/values.schema.json
+	schematyper --package v1 -o api/v1/postgresql_types.go helm-charts/postgresql/values.schema.json
+	#$(SCHEMATYPER) -p v1 --schema-output=api/v1/jupyterhub_types.go helm-charts/jupyterhub/values.schema.json
+
 fmt: ## Run go fmt against code.
 	go fmt ./...
 
@@ -144,6 +149,14 @@ kustomize: ## Download kustomize locally if necessary.
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
 	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
+
+#SCHEMATYPER = $(shell pwd)/bin/gojsonschema
+#schematyper: ## Download schematyper locally if necessary.
+#	$(call go-get-tool,$(SCHEMATYPER),github.com/atombender/go-jsonschema@latest)
+#
+SCHEMATYPER = $(shell pwd)/bin/schematyper
+schematyper: ## Download schematyper locally if necessary.
+	$(call go-get-tool,$(SCHEMATYPER),github.com/idubinskiy/schematyper@latest)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

@@ -28,6 +28,10 @@ type PostgresUserSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// Dossier is the name of the dossier where to add the user
+	// +kubebuilder:validation:Required
+	Dossier string `json:"dossier,omitempty" yaml:"dossier,omitempty"`
+
 	// The username of the user to be added
 	// +kubebuilder:validation:Required
 	Username string `json:"username,omitempty"`

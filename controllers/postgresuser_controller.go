@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"strings"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -113,7 +114,7 @@ func (r *PostgresUserReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *PostgresUserReconciler) addUserIfNotExists(ctx context.Context, dbUser *streamflowv1.PostgresUser) error {
-	db, err := r.connectToDb(ctx, types.NamespacedName{dbUser.Spec.Dossier, dbUser.Namespace})
+	db, err := r.connectToDb(ctx, types.NamespacedName{dbUser.Namespace, dbUser.Spec.Dossier})
 	if err != nil {
 		logger.Error(err, "Unable to establish a connection to the database")
 		return err
@@ -142,8 +143,9 @@ func (r *PostgresUserReconciler) connectToDb(ctx context.Context, dossierName ty
 		logger.Error(err, "Failed to get Dossier named: "+dossierName.String())
 		return nil, err
 	}
-	connectionString := dossier.Spec.Jhub.UnstructuredContent()["hub.db.url"].(string)
-	password := dossier.Spec.Jhub.UnstructuredContent()["hub.db.password"].(string)
+	//connectionString := "postgres://jhub@localhost:5432/jhubdb"
+	connectionString := getValueByKey("hub.db.url", dossier.Spec.Jhub.UnstructuredContent()).(string)
+	password := getValueByKey("hub.db.password", dossier.Spec.Jhub.UnstructuredContent()).(string)
 
 	sqldb := sql.OpenDB(pgdriver.NewConnector(
 		pgdriver.WithDSN(sanitizeDsn(connectionString)),
@@ -155,6 +157,16 @@ func (r *PostgresUserReconciler) connectToDb(ctx context.Context, dossierName ty
 	))
 
 	return db, nil
+}
+
+func getValueByKey(key string, src map[string]interface{}) interface{} {
+	splits := strings.Split(key, ".")
+
+	if len(splits) > 1 {
+		return getValueByKey(strings.Join(splits[1:], "."), src[splits[0]].(map[string]interface{}))
+	} else {
+		return src[splits[0]]
+	}
 }
 
 func sanitizeDsn(dsn string) string {

@@ -84,13 +84,7 @@ func main() {
 
 	setupDossierReconciler(err, mgr)
 
-	if err = (&controllers.PostgresUserReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "PostgresUser")
-		os.Exit(1)
-	}
+	setupPostgresUserReconciler(err, mgr)
 	//+kubebuilder:scaffold:builder
 
 	addChecks(mgr)
@@ -135,6 +129,17 @@ func setupDossierReconciler(err error, mgr manager.Manager) {
 		Log:    ctrl.Log.WithName("controllers").WithName("Dossier"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Dossier")
+		os.Exit(1)
+	}
+}
+
+func setupPostgresUserReconciler(err error, mgr manager.Manager) {
+	if err = (&controllers.PostgresUserReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Log:    ctrl.Log.WithName("controllers").WithName("PostgresUser"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PostgresUser")
 		os.Exit(1)
 	}
 }

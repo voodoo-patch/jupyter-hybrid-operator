@@ -8,6 +8,7 @@ make deploy
 to debug locally:
 
 ```sh
+export WATCH_NAMESPACE={{mynamespace}}
 make install run
 dlv debug --headless --listen=:2345 --api-version=2
 ```

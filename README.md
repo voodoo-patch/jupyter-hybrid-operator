@@ -8,6 +8,7 @@ make deploy
 to debug locally:
 
 ```sh
+make install run
 dlv debug --headless --listen=:2345 --api-version=2
 ```
 

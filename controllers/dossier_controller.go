@@ -168,7 +168,7 @@ func (r *DossierReconciler) createJhubIfNotExists(ctx context.Context, dossier *
 			return ctrl.Result{}, err
 		}
 		dossier.Status.JhubCR = jhub.GetName()
-		err := r.Update(ctx, dossier)
+		err := r.Status().Update(ctx, dossier)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -189,7 +189,7 @@ func (r *DossierReconciler) createPostgresIfNotExists(ctx context.Context, dossi
 			return ctrl.Result{}, err
 		}
 		dossier.Status.PostgresCR = postgres.GetName()
-		err := r.Update(ctx, dossier)
+		err := r.Status().Update(ctx, dossier)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

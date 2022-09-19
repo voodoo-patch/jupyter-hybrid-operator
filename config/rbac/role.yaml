@@ -9,6 +9,9 @@ rules:
   - streamflow.edu.unito.it
   resources:
   - dossiers
+  - jupyterhubs
+  - postgresqls
+  - postgresusers
   verbs:
   - create
   - delete
@@ -27,22 +30,13 @@ rules:
   - streamflow.edu.unito.it
   resources:
   - dossiers/status
+  - jupyterhubs/status
+  - postgresqls/status
+  - postgresusers/status
   verbs:
   - get
   - patch
   - update
-- apiGroups:
-  - streamflow.edu.unito.it
-  resources:
-  - postgresusers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - streamflow.edu.unito.it
   resources:
@@ -50,10 +44,219 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - streamflow.edu.unito.it
+    - ""
+    - apps
   resources:
-  - postgresusers/status
+    - secrets
+    - configmaps
+    - services
+    - statefulsets
+    - daemonsets
+    - deployments
+    - replicasets
+    - jobs
+    - cronjobs
+    - networkpolicies
+    - pods
+    - persistentvolumeclaims
+    - events
   verbs:
-  - get
-  - patch
-  - update
+    - get
+    - watch
+    - list
+    - create
+    - delete
+    - patch
+    - update
+- apiGroups:
+    - ""
+  resources:
+    - events
+  verbs:
+    - get
+    - watch
+    - list
+- apiGroups:
+    - ""
+    - events.k8s.io
+  resources:
+    - events
+  verbs:
+    - create
+    - patch
+    - update
+- apiGroups:
+  - policy
+  resources:
+    - podsecuritypolicies
+  verbs:
+    - use
+- apiGroups:
+    - "networking.k8s.io"
+  resources:
+    - networkpolicies
+  verbs:
+    - get
+    - watch
+    - list
+    - create
+    - delete
+    - patch
+- apiGroups:
+    - coordination.k8s.io
+  resources:
+    - leases
+  verbs:
+    - get
+    - update
+    - create
+- apiGroups:
+    - ""
+  resources:
+    - endpoints
+  verbs:
+    - create
+- apiGroups:
+    - ""
+  resources:
+    - endpoints
+  verbs:
+    - get
+    - update
+- apiGroups:
+    - ""
+  resources:
+    - nodes
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
+    - ""
+  resources:
+    - pods
+  verbs:
+    - delete
+    - get
+    - list
+    - watch
+- apiGroups:
+    - ""
+  resources:
+    - bindings
+    - pods/binding
+  verbs:
+    - create
+- apiGroups:
+    - ""
+  resources:
+    - pods/status
+  verbs:
+    - patch
+    - update
+- apiGroups:
+    - ""
+  resources:
+    - replicationcontrollers
+    - services
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
+    - apps
+    - extensions
+  resources:
+    - replicasets
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
+    - apps
+  resources:
+    - statefulsets
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
+    - policy
+  resources:
+    - poddisruptionbudgets
+  verbs:
+    - get
+    - list
+    - watch
+    - update
+    - patch
+- apiGroups:
+    - ""
+  resources:
+    - persistentvolumeclaims
+    - persistentvolumes
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
+    - authentication.k8s.io
+  resources:
+    - tokenreviews
+  verbs:
+    - create
+- apiGroups:
+    - authorization.k8s.io
+  resources:
+    - subjectaccessreviews
+  verbs:
+    - create
+- apiGroups:
+    - storage.k8s.io
+  resources:
+    - csinodes
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
+    - ""
+  resources:
+    - persistentvolumes
+  verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - storage.k8s.io
+  resources:
+    - storageclasses
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
+    - ""
+  resources:
+    - persistentvolumeclaims
+  verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - ""
+    - "rbac.authorization.k8s.io"
+  resources:
+    - serviceaccounts
+    - clusterroles
+    - clusterrolebindings
+    - roles
+    - rolebindings
+  verbs:
+    - get
+    - list
+    - update

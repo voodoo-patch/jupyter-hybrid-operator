@@ -48,9 +48,6 @@ type DossierStatus struct {
 
 	// PostgresCR is the name of the created postgres custom resource
 	PostgresCR string `json:"postgres-cr,omitempty" yaml:"postgres-cr,omitempty"`
-
-	// Conditions represent the latest available observations of an object's state
-	Conditions []metav1.Condition `json:"conditions"`
 }
 
 // Dossier is the Schema for the dossiers API

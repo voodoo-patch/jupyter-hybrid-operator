@@ -19,8 +19,11 @@ package controllers
 import (
 	"context"
 	"database/sql"
-	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/go-logr/logr"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/stdlib"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/extra/bundebug"
 	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,11 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/pgdialect"
-	"github.com/uptrace/bun/driver/pgdriver"
-	"github.com/uptrace/bun/extra/bundebug"
 )
 
 var finalizer = streamflowv1.GroupVersion.Group + "/finalizer"
@@ -52,11 +53,14 @@ type PostgresUserReconciler struct {
 type User struct {
 	bun.BaseModel `bun:"table:users,alias:u"`
 
-	ID           int64     `bun:"id,pk"`
-	Name         string    `bun:"name,notnull"`
-	Admin        bool      `bun:"admin,notnull"`
-	Created      date.Date `bun:"created,notnull"`
-	LastActivity date.Date `bun:"last_activity,notnull"`
+	ID                 int64     `bun:"id,pk"`
+	Name               string    `bun:"name,notnull"`
+	Admin              bool      `bun:"admin,notnull"`
+	Created            time.Time `bun:"created,nullzero,notnull,default:current_timestamp"`
+	LastActivity       time.Time `bun:"last_activity,nullzero,notnull,default:current_timestamp"`
+	CookieId           string    `bun:"cookie_id,notnull"`
+	State              string    `bun:"state,notnull"`
+	EncryptedAuthState []byte    `bun:"encrypted_auth_state,notnull"`
 }
 
 //+kubebuilder:rbac:groups=streamflow.edu.unito.it,resources=postgresusers,verbs=get;list;watch;create;update;patch;delete
@@ -76,7 +80,7 @@ func (r *PostgresUserReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	var result ctrl.Result
 	_ = log.FromContext(ctx)
 
-	logger := r.Log.WithValues("postgresUser", req.NamespacedName)
+	logger = r.Log.WithValues("postgresUser", req.NamespacedName)
 
 	// Fetch the PostgresUser instance
 	dbUser := &streamflowv1.PostgresUser{}
@@ -114,17 +118,21 @@ func (r *PostgresUserReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *PostgresUserReconciler) addUserIfNotExists(ctx context.Context, dbUser *streamflowv1.PostgresUser) error {
-	db, err := r.connectToDb(ctx, types.NamespacedName{dbUser.Namespace, dbUser.Spec.Dossier})
+	dossier, err := r.getDossier(ctx, types.NamespacedName{dbUser.Namespace, dbUser.Spec.Dossier})
+	if err != nil {
+		return err
+	}
+	db, err := r.connectToDb(ctx, dossier)
 	if err != nil {
 		logger.Error(err, "Unable to establish a connection to the database")
 		return err
 	}
 	existingUser, err := getUser(ctx, db, dbUser)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		logger.Error(err, "Error while retrieving user from db")
 		return err
 	}
-	if existingUser == nil {
+	if err == sql.ErrNoRows {
 		err = addUser(ctx, db, dbUser)
 	} else if existingUser.Admin != dbUser.Spec.IsAdmin {
 		err = deleteUser(ctx, db, dbUser)
@@ -136,27 +144,36 @@ func (r *PostgresUserReconciler) addUserIfNotExists(ctx context.Context, dbUser 
 	return err
 }
 
-func (r *PostgresUserReconciler) connectToDb(ctx context.Context, dossierName types.NamespacedName) (*bun.DB, error) {
+func (r *PostgresUserReconciler) getDossier(ctx context.Context, dossierName types.NamespacedName) (*streamflowv1.Dossier, error) {
 	dossier := &streamflowv1.Dossier{}
 	err := r.Get(ctx, dossierName, dossier)
 	if err != nil {
 		logger.Error(err, "Failed to get Dossier named: "+dossierName.String())
 		return nil, err
 	}
-	//connectionString := "postgres://jhub@localhost:5432/jhubdb"
-	connectionString := getValueByKey("hub.db.url", dossier.Spec.Jhub.UnstructuredContent()).(string)
+	return dossier, nil
+}
+
+func (r *PostgresUserReconciler) connectToDb(ctx context.Context, dossier *streamflowv1.Dossier) (*bun.DB, error) {
+	connectionString := "postgres://jhub@localhost:5432/jhubdb"
+	//connectionString := getValueByKey("hub.db.url", dossier.Spec.Jhub.UnstructuredContent()).(string)
 	password := getValueByKey("hub.db.password", dossier.Spec.Jhub.UnstructuredContent()).(string)
 
-	sqldb := sql.OpenDB(pgdriver.NewConnector(
-		pgdriver.WithDSN(sanitizeDsn(connectionString)),
-		pgdriver.WithPassword(password)))
+	config, err := pgx.ParseConfig(sanitizeDsn(connectionString) + "?sslmode=disable")
+	if err != nil {
+		panic(err)
+	}
+	config.PreferSimpleProtocol = true
+	config.Password = password
+
+	sqldb := stdlib.OpenDB(*config)
 	db := bun.NewDB(sqldb, pgdialect.New())
 	db.AddQueryHook(bundebug.NewQueryHook(
 		bundebug.WithVerbose(true),
 		bundebug.FromEnv("BUNDEBUG"),
 	))
 
-	return db, nil
+	return db, db.Ping()
 }
 
 func getValueByKey(key string, src map[string]interface{}) interface{} {
@@ -178,8 +195,7 @@ func getUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser)
 	err := db.
 		NewSelect().
 		Model(user).
-		TableExpr("users").
-		Where("name = ?", dbUser.Spec.Username).
+		Where("?TableAlias.name = ?", dbUser.Spec.Username).
 		Limit(1).
 		Scan(ctx)
 	return user, err
@@ -187,10 +203,8 @@ func getUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser)
 
 func addUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) error {
 	user := &User{
-		Name:         dbUser.Spec.Username,
-		Admin:        dbUser.Spec.IsAdmin,
-		Created:      date.Date{},
-		LastActivity: date.Date{},
+		Name:  dbUser.Spec.Username,
+		Admin: dbUser.Spec.IsAdmin,
 	}
 	_, err := db.NewInsert().
 		Model(user).
@@ -203,7 +217,8 @@ func addUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser)
 
 func deleteUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) error {
 	_, err := db.NewDelete().
-		Where("name = ?", dbUser.Spec.Username).
+		Model(&User{}).
+		Where("?TableAlias.name = ?", dbUser.Spec.Username).
 		Exec(ctx)
 	if err != nil {
 		logger.Error(err, "Error while deleting user from db")
@@ -243,7 +258,15 @@ func (r *PostgresUserReconciler) handleDeletion(ctx context.Context, dbUser *str
 }
 
 func (r *PostgresUserReconciler) finalizePostrgresUser(ctx context.Context, log logr.Logger, dbUser *streamflowv1.PostgresUser) error {
-
+	dossier, err := r.getDossier(ctx, types.NamespacedName{dbUser.Namespace, dbUser.Spec.Dossier})
+	if err != nil {
+		return err
+	}
+	db, err := r.connectToDb(ctx, dossier)
+	err = deleteUser(ctx, db, dbUser)
+	if err != nil {
+		return err
+	}
 	log.Info("Successfully finalized dbUser")
 
 	return nil

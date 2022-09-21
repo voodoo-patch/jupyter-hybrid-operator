@@ -20,9 +20,9 @@ import (
 	"context"
 	"database/sql"
 	"github.com/go-logr/logr"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/stdlib"
+	"github.com/google/uuid"
 	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/extra/bundebug"
 	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -53,12 +53,12 @@ type PostgresUserReconciler struct {
 type User struct {
 	bun.BaseModel `bun:"table:users,alias:u"`
 
-	ID                 int64     `bun:"id,pk"`
+	ID                 int64     `bun:"id,pk,autoincrement"`
 	Name               string    `bun:"name,notnull"`
 	Admin              bool      `bun:"admin,notnull"`
 	Created            time.Time `bun:"created,nullzero,notnull,default:current_timestamp"`
 	LastActivity       time.Time `bun:"last_activity,nullzero,notnull,default:current_timestamp"`
-	CookieId           string    `bun:"cookie_id,notnull"`
+	CookieId           string    `bun:"cookie_id,notnull,type:uuid,default:uuid_generate_v4()"`
 	State              string    `bun:"state,notnull"`
 	EncryptedAuthState []byte    `bun:"encrypted_auth_state,notnull"`
 }
@@ -155,18 +155,14 @@ func (r *PostgresUserReconciler) getDossier(ctx context.Context, dossierName typ
 }
 
 func (r *PostgresUserReconciler) connectToDb(ctx context.Context, dossier *streamflowv1.Dossier) (*bun.DB, error) {
-	connectionString := "postgres://jhub@localhost:5432/jhubdb"
-	//connectionString := getValueByKey("hub.db.url", dossier.Spec.Jhub.UnstructuredContent()).(string)
+	//connectionString := "postgres://jhub@localhost:5432/jhubdb"
+	connectionString := getValueByKey("hub.db.url", dossier.Spec.Jhub.UnstructuredContent()).(string)
 	password := getValueByKey("hub.db.password", dossier.Spec.Jhub.UnstructuredContent()).(string)
 
-	config, err := pgx.ParseConfig(sanitizeDsn(connectionString) + "?sslmode=disable")
-	if err != nil {
-		panic(err)
-	}
-	config.PreferSimpleProtocol = true
-	config.Password = password
-
-	sqldb := stdlib.OpenDB(*config)
+	sqldb := sql.OpenDB(pgdriver.NewConnector(
+		pgdriver.WithDSN(sanitizeDsn(connectionString)),
+		pgdriver.WithPassword(password),
+		pgdriver.WithInsecure(true)))
 	db := bun.NewDB(sqldb, pgdialect.New())
 	db.AddQueryHook(bundebug.NewQueryHook(
 		bundebug.WithVerbose(true),
@@ -203,8 +199,9 @@ func getUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser)
 
 func addUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) error {
 	user := &User{
-		Name:  dbUser.Spec.Username,
-		Admin: dbUser.Spec.IsAdmin,
+		Name:     dbUser.Spec.Username,
+		Admin:    dbUser.Spec.IsAdmin,
+		CookieId: uuid.New().String(),
 	}
 	_, err := db.NewInsert().
 		Model(user).

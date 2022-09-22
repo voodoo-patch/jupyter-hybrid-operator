@@ -48,6 +48,10 @@ spec:
             type: object
           status:
             description: PostgresUserStatus defines the observed state of PostgresUser
+            properties:
+              username:
+                description: Username represents the persisted username
+                type: string
             type: object
         type: object
     served: true

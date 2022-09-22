@@ -118,7 +118,7 @@ func (r *PostgresUserReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 func (r *PostgresUserReconciler) addUserIfNotExists(ctx context.Context, dbUser *streamflowv1.PostgresUser) error {
-	dossier, err := r.getDossier(ctx, types.NamespacedName{dbUser.Namespace, dbUser.Spec.Dossier})
+	dossier, err := r.getDossier(ctx, types.NamespacedName{Namespace: dbUser.Namespace, Name: dbUser.Spec.Dossier})
 	if err != nil {
 		return err
 	}
@@ -127,19 +127,27 @@ func (r *PostgresUserReconciler) addUserIfNotExists(ctx context.Context, dbUser 
 		logger.Error(err, "Unable to establish a connection to the database")
 		return err
 	}
+
+	if dbUser.Status.Username != "" && dbUser.Status.Username != dbUser.Spec.Username {
+		err = deleteUser(ctx, db, dbUser.Status.Username)
+		if err != nil {
+			return err
+		}
+	}
+
 	existingUser, err := getUser(ctx, db, dbUser)
 	if err != nil && err != sql.ErrNoRows {
 		logger.Error(err, "Error while retrieving user from db")
 		return err
 	}
 	if err == sql.ErrNoRows {
-		err = addUser(ctx, db, dbUser)
+		err = r.addUser(ctx, db, dbUser)
 	} else if existingUser.Admin != dbUser.Spec.IsAdmin {
-		err = deleteUser(ctx, db, dbUser)
+		err = deleteUser(ctx, db, dbUser.Spec.Username)
 		if err != nil {
 			return err
 		}
-		err = addUser(ctx, db, dbUser)
+		err = r.addUser(ctx, db, dbUser)
 	}
 	return err
 }
@@ -197,11 +205,13 @@ func getUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser)
 	return user, err
 }
 
-func addUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) error {
+func (r *PostgresUserReconciler) addUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) error {
 	user := &User{
-		Name:     dbUser.Spec.Username,
-		Admin:    dbUser.Spec.IsAdmin,
-		CookieId: uuid.New().String(),
+		Name:         dbUser.Spec.Username,
+		Admin:        dbUser.Spec.IsAdmin,
+		Created:      time.Now(),
+		LastActivity: time.Now(),
+		CookieId:     uuid.New().String(),
 	}
 	_, err := db.NewInsert().
 		Model(user).
@@ -209,13 +219,20 @@ func addUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser)
 	if err != nil {
 		logger.Error(err, "Error while adding user to db")
 	}
+
+	dbUser.Status.Username = dbUser.Spec.Username
+	err = r.Status().Update(ctx, dbUser)
+	if err != nil {
+		logger.Error(err, "Error while updating user status")
+	}
+
 	return err
 }
 
-func deleteUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) error {
+func deleteUser(ctx context.Context, db *bun.DB, username string) error {
 	_, err := db.NewDelete().
 		Model(&User{}).
-		Where("?TableAlias.name = ?", dbUser.Spec.Username).
+		Where("?TableAlias.name = ?", username).
 		Exec(ctx)
 	if err != nil {
 		logger.Error(err, "Error while deleting user from db")
@@ -260,7 +277,7 @@ func (r *PostgresUserReconciler) finalizePostrgresUser(ctx context.Context, log 
 		return err
 	}
 	db, err := r.connectToDb(ctx, dossier)
-	err = deleteUser(ctx, db, dbUser)
+	err = deleteUser(ctx, db, dbUser.Spec.Username)
 	if err != nil {
 		return err
 	}

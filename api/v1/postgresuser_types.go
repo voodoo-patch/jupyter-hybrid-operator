@@ -44,13 +44,14 @@ type PostgresUserSpec struct {
 // PostgresUserStatus defines the observed state of PostgresUser
 type PostgresUserStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+
+	// Username represents the persisted username
+	Username string `json:"username,omitempty" yaml:"username,omitempty"`
 }
 
+// PostgresUser is the Schema for the postgresusers API
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-
-// PostgresUser is the Schema for the postgresusers API
 type PostgresUser struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

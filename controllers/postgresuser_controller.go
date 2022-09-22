@@ -122,7 +122,7 @@ func (r *PostgresUserReconciler) addUserIfNotExists(ctx context.Context, dbUser 
 	if err != nil {
 		return err
 	}
-	db, err := r.connectToDb(ctx, dossier)
+	db, err := r.connectToDb(dossier)
 	if err != nil {
 		logger.Error(err, "Unable to establish a connection to the database")
 		return err
@@ -162,7 +162,7 @@ func (r *PostgresUserReconciler) getDossier(ctx context.Context, dossierName typ
 	return dossier, nil
 }
 
-func (r *PostgresUserReconciler) connectToDb(ctx context.Context, dossier *streamflowv1.Dossier) (*bun.DB, error) {
+func (r *PostgresUserReconciler) connectToDb(dossier *streamflowv1.Dossier) (*bun.DB, error) {
 	//connectionString := "postgres://jhub@localhost:5432/jhubdb"
 	connectionString := getValueByKey("hub.db.url", dossier.Spec.Jhub.UnstructuredContent()).(string)
 	password := getValueByKey("hub.db.password", dossier.Spec.Jhub.UnstructuredContent()).(string)
@@ -276,7 +276,7 @@ func (r *PostgresUserReconciler) finalizePostrgresUser(ctx context.Context, log 
 	if err != nil {
 		return err
 	}
-	db, err := r.connectToDb(ctx, dossier)
+	db, err := r.connectToDb(dossier)
 	err = deleteUser(ctx, db, dbUser.Spec.Username)
 	if err != nil {
 		return err

@@ -49,13 +49,6 @@ type DossierReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Dossier object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.2/pkg/reconcile
 func (r *DossierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var result ctrl.Result
 	_ = log.FromContext(ctx)
@@ -89,13 +82,13 @@ func (r *DossierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Define a new jhub resource
-	result, err = r.createJhubIfNotExists(ctx, dossier, log)
+	result, err = r.reconcileJhub(ctx, dossier, log)
 	if err != nil {
 		return result, err
 	}
 
 	// Define a new postgres resource
-	result, err = r.createPostgresIfNotExists(ctx, dossier, log)
+	result, err = r.reconcilePostgres(ctx, dossier, log)
 	if err != nil {
 		return result, err
 	}
@@ -155,7 +148,7 @@ func (r *DossierReconciler) finalizeDossier(ctx context.Context, log logr.Logger
 	return nil
 }
 
-func (r *DossierReconciler) createJhubIfNotExists(ctx context.Context, dossier *streamflowv1.Dossier, log logr.Logger) (ctrl.Result, error) {
+func (r *DossierReconciler) reconcileJhub(ctx context.Context, dossier *streamflowv1.Dossier, log logr.Logger) (ctrl.Result, error) {
 	jhub := getJhubCustomResource(dossier, false)
 	err := r.Get(ctx, client.ObjectKeyFromObject(jhub), jhub)
 	if err != nil && errors.IsNotFound(err) {
@@ -172,11 +165,17 @@ func (r *DossierReconciler) createJhubIfNotExists(ctx context.Context, dossier *
 		if err != nil {
 			return ctrl.Result{}, err
 		}
+	} else {
+		jhub = getJhubCustomResource(dossier, true)
+		err = r.Update(ctx, jhub)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *DossierReconciler) createPostgresIfNotExists(ctx context.Context, dossier *streamflowv1.Dossier, log logr.Logger) (ctrl.Result, error) {
+func (r *DossierReconciler) reconcilePostgres(ctx context.Context, dossier *streamflowv1.Dossier, log logr.Logger) (ctrl.Result, error) {
 	postgres := getPostgresCustomResource(dossier, false)
 	err := r.Get(ctx, client.ObjectKeyFromObject(postgres), postgres)
 	if err != nil && errors.IsNotFound(err) {
@@ -190,6 +189,12 @@ func (r *DossierReconciler) createPostgresIfNotExists(ctx context.Context, dossi
 		}
 		dossier.Status.PostgresCR = postgres.GetName()
 		err := r.Status().Update(ctx, dossier)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		postgres = getJhubCustomResource(dossier, true)
+		err = r.Update(ctx, postgres)
 		if err != nil {
 			return ctrl.Result{}, err
 		}

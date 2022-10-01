@@ -47,7 +47,7 @@ ifeq ($(USE_IMAGE_DIGESTS), true)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG ?= samuelepecetto/jupyter-hybrid-operator:v0.0.1
+IMG ?= samuelepecetto/jupyter-hybrid-operator:v0.1.1
 TARGET_NAMESPACE ?= jhub-pecetto
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 # CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"

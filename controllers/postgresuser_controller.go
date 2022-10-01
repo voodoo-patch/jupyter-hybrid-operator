@@ -53,14 +53,14 @@ type PostgresUserReconciler struct {
 type User struct {
 	bun.BaseModel `bun:"table:users,alias:u"`
 
-	ID                 int64     `bun:"id,pk,autoincrement"`
-	Name               string    `bun:"name,notnull"`
-	Admin              bool      `bun:"admin,notnull"`
-	Created            time.Time `bun:"created,nullzero,notnull,default:current_timestamp"`
-	LastActivity       time.Time `bun:"last_activity,nullzero,notnull,default:current_timestamp"`
-	CookieId           string    `bun:"cookie_id,notnull,type:uuid,default:uuid_generate_v4()"`
-	State              string    `bun:"state,notnull"`
-	EncryptedAuthState []byte    `bun:"encrypted_auth_state,notnull"`
+	ID                 int64          `bun:"id,pk,autoincrement"`
+	Name               string         `bun:"name,notnull"`
+	Admin              bool           `bun:"admin,notnull"`
+	Created            time.Time      `bun:"created,nullzero,notnull,default:current_timestamp"`
+	LastActivity       time.Time      `bun:"last_activity,nullzero,notnull,default:current_timestamp"`
+	CookieId           string         `bun:"cookie_id,notnull,type:uuid,default:uuid_generate_v4()"`
+	State              sql.NullString `bun:"state"`
+	EncryptedAuthState []byte         `bun:"encrypted_auth_state,notnull"`
 }
 
 //+kubebuilder:rbac:groups=streamflow.edu.unito.it,resources=postgresusers,verbs=get;list;watch;create;update;patch;delete
@@ -69,13 +69,6 @@ type User struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the PostgresUser object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.2/pkg/reconcile
 func (r *PostgresUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var result ctrl.Result
 	_ = log.FromContext(ctx)

@@ -5,20 +5,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: dossiers.streamflow.edu.unito.it
+  name: postgresusers.dossier.di.unito.it
 spec:
-  group: streamflow.edu.unito.it
+  group: dossier.di.unito.it
   names:
-    kind: Dossier
-    listKind: DossierList
-    plural: dossiers
-    singular: dossier
+    kind: PostgresUser
+    listKind: PostgresUserList
+    plural: postgresusers
+    singular: postgresuser
   scope: Namespaced
   versions:
   - name: v1
     schema:
       openAPIV3Schema:
-        description: Dossier is the Schema for the dossiers API
+        description: PostgresUser is the Schema for the postgresusers API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -33,28 +33,24 @@ spec:
           metadata:
             type: object
           spec:
-            description: DossierSpec defines the desired state of Dossier
+            description: PostgresUserSpec defines the desired state of PostgresUser
             properties:
-              jhub:
-                description: Jhub is a generic object that should reflect jupyterhub
-                  values schema
-                type: object
-                x-kubernetes-preserve-unknown-fields: true
-              postgres:
-                description: Postgres is a generic object that should reflect postgres
-                  values schema
-                type: object
-                x-kubernetes-preserve-unknown-fields: true
+              dossier:
+                description: Dossier is the name of the dossier where to add the user
+                type: string
+              isAdmin:
+                default: false
+                description: Indicates whether the user is admin
+                type: boolean
+              username:
+                description: The username of the user to be added
+                type: string
             type: object
           status:
-            description: JupyterhubStatus defines the observed state of Dossier
+            description: PostgresUserStatus defines the observed state of PostgresUser
             properties:
-              jhub-cr:
-                description: JhubCR is the name of the created jupyterhub custom resource
-                type: string
-              postgres-cr:
-                description: PostgresCR is the name of the created postgres custom
-                  resource
+              username:
+                description: Username represents the persisted username
                 type: string
             type: object
         type: object

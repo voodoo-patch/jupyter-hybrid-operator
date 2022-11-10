@@ -1,9 +1,9 @@
 # Use the 'create api' subcommand to add watches to this file.
-- group: streamflow.edu.unito.it
+- group: dossier.di.unito.it
   version: v1alpha1
   kind: Jupyterhub
   chart: helm-charts/jupyterhub
-- group: streamflow.edu.unito.it
+- group: dossier.di.unito.it
   version: v1alpha1
   kind: Postgresql
   chart: helm-charts/postgresql

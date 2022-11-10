@@ -38,7 +38,7 @@ type DossierSpec struct {
 	Postgres unstructured.Unstructured `json:"postgres,omitempty" yaml:"postgres,omitempty"`
 }
 
-// JupyterhubStatus defines the observed state of Dossier
+// DossierStatus defines the observed state of Dossier
 type DossierStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file

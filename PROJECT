@@ -1,4 +1,4 @@
-domain: edu.unito.it
+domain: di.unito.it
 layout:
 - hybrid.helm.sdk.operatorframework.io/v1-alpha
 plugins:
@@ -10,32 +10,32 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
-  domain: edu.unito.it
-  group: streamflow
+  domain: di.unito.it
+  group: dossier
   kind: Jupyterhub
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: edu.unito.it
-  group: streamflow
+  domain: di.unito.it
+  group: dossier
   kind: Dossier
   path: github.com/voodoo-patch/jupyter-hybrid-operator/api/v1
   version: v1
 - api:
     crdVersion: v1
     namespaced: true
-  domain: edu.unito.it
-  group: streamflow
+  domain: di.unito.it
+  group: dossier
   kind: Postgresql
   version: v1alpha1
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: edu.unito.it
-  group: streamflow
+  domain: di.unito.it
+  group: dossier
   kind: PostgresUser
   path: github.com/voodoo-patch/jupyter-hybrid-operator/api/v1
   version: v1

@@ -31,10 +31,10 @@ import (
 
 	// "sigs.k8s.io/controller-runtime/pkg/log"
 
-	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
+	dossierv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
 )
 
-var dossierFinalizer = streamflowv1.GroupVersion.Group + "/finalizer"
+var dossierFinalizer = dossierv1.GroupVersion.Group + "/finalizer"
 
 // DossierReconciler reconciles a Dossier object
 type DossierReconciler struct {
@@ -43,9 +43,9 @@ type DossierReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=streamflow.edu.unito.it,resources=dossiers,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=streamflow.edu.unito.it,resources=dossiers/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=streamflow.edu.unito.it,resources=dossiers/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dossier.di.unito.it,resources=dossiers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dossier.di.unito.it,resources=dossiers/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dossier.di.unito.it,resources=dossiers/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -55,7 +55,7 @@ func (r *DossierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log := r.Log.WithValues("dossier", req.NamespacedName)
 	// Fetch the Dossier instance
-	dossier := &streamflowv1.Dossier{}
+	dossier := &dossierv1.Dossier{}
 	err := r.Get(ctx, req.NamespacedName, dossier)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -97,7 +97,7 @@ func (r *DossierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{Requeue: true}, nil
 }
 
-func (r *DossierReconciler) addFinalizer(ctx context.Context, dossier *streamflowv1.Dossier) (ctrl.Result, error) {
+func (r *DossierReconciler) addFinalizer(ctx context.Context, dossier *dossierv1.Dossier) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(dossier, dossierFinalizer) {
 		controllerutil.AddFinalizer(dossier, dossierFinalizer)
 		err := r.Update(ctx, dossier)
@@ -108,7 +108,7 @@ func (r *DossierReconciler) addFinalizer(ctx context.Context, dossier *streamflo
 	return ctrl.Result{}, nil
 }
 
-func (r *DossierReconciler) handleDeletion(ctx context.Context, dossier *streamflowv1.Dossier, log logr.Logger) (ctrl.Result, error) {
+func (r *DossierReconciler) handleDeletion(ctx context.Context, dossier *dossierv1.Dossier, log logr.Logger) (ctrl.Result, error) {
 	if controllerutil.ContainsFinalizer(dossier, dossierFinalizer) {
 		// Run finalization logic for dossierFinalizer. If the
 		// finalization logic fails, don't remove the finalizer so
@@ -128,7 +128,7 @@ func (r *DossierReconciler) handleDeletion(ctx context.Context, dossier *streamf
 	return ctrl.Result{}, nil
 }
 
-func (r *DossierReconciler) finalizeDossier(ctx context.Context, log logr.Logger, dossier *streamflowv1.Dossier) error {
+func (r *DossierReconciler) finalizeDossier(ctx context.Context, log logr.Logger, dossier *dossierv1.Dossier) error {
 	// delete jhub
 	jhub := getJhubCustomResource(dossier, true)
 	err := r.Client.Delete(ctx, jhub)
@@ -148,7 +148,7 @@ func (r *DossierReconciler) finalizeDossier(ctx context.Context, log logr.Logger
 	return nil
 }
 
-func (r *DossierReconciler) reconcileJhub(ctx context.Context, dossier *streamflowv1.Dossier, log logr.Logger) (ctrl.Result, error) {
+func (r *DossierReconciler) reconcileJhub(ctx context.Context, dossier *dossierv1.Dossier, log logr.Logger) (ctrl.Result, error) {
 	jhub := getJhubCustomResource(dossier, false)
 	err := r.Get(ctx, client.ObjectKeyFromObject(jhub), jhub)
 	if err != nil && errors.IsNotFound(err) {
@@ -175,7 +175,7 @@ func (r *DossierReconciler) reconcileJhub(ctx context.Context, dossier *streamfl
 	return ctrl.Result{}, nil
 }
 
-func (r *DossierReconciler) reconcilePostgres(ctx context.Context, dossier *streamflowv1.Dossier, log logr.Logger) (ctrl.Result, error) {
+func (r *DossierReconciler) reconcilePostgres(ctx context.Context, dossier *dossierv1.Dossier, log logr.Logger) (ctrl.Result, error) {
 	postgres := getPostgresCustomResource(dossier, false)
 	err := r.Get(ctx, client.ObjectKeyFromObject(postgres), postgres)
 	if err != nil && errors.IsNotFound(err) {
@@ -212,7 +212,7 @@ func (r *DossierReconciler) logCreatingCR(log logr.Logger, cr *unstructured.Unst
 	log.Info(fmt.Sprintf("Creating a new %s", kind), fmt.Sprintf("%s.Namespace", kind), cr.GetNamespace(), fmt.Sprintf("%s.Name", kind), cr.GetName())
 }
 
-func getJhubCustomResource(d *streamflowv1.Dossier, withSpec bool) *unstructured.Unstructured {
+func getJhubCustomResource(d *dossierv1.Dossier, withSpec bool) *unstructured.Unstructured {
 	u := &unstructured.Unstructured{}
 	if withSpec {
 		jhub := d.Spec.Jhub
@@ -222,7 +222,7 @@ func getJhubCustomResource(d *streamflowv1.Dossier, withSpec bool) *unstructured
 		})
 	}
 	u.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   streamflowv1.GroupVersion.Group,
+		Group:   dossierv1.GroupVersion.Group,
 		Kind:    "Jupyterhub",
 		Version: "v1alpha1",
 	})
@@ -232,7 +232,7 @@ func getJhubCustomResource(d *streamflowv1.Dossier, withSpec bool) *unstructured
 	return u
 }
 
-func getPostgresCustomResource(d *streamflowv1.Dossier, withSpec bool) *unstructured.Unstructured {
+func getPostgresCustomResource(d *dossierv1.Dossier, withSpec bool) *unstructured.Unstructured {
 	u := &unstructured.Unstructured{}
 	if withSpec {
 		postgres := d.Spec.Postgres
@@ -242,7 +242,7 @@ func getPostgresCustomResource(d *streamflowv1.Dossier, withSpec bool) *unstruct
 		})
 	}
 	u.SetGroupVersionKind(schema.GroupVersionKind{
-		Group:   streamflowv1.GroupVersion.Group,
+		Group:   dossierv1.GroupVersion.Group,
 		Kind:    "Postgresql",
 		Version: "v1alpha1",
 	})
@@ -255,6 +255,6 @@ func getPostgresCustomResource(d *streamflowv1.Dossier, withSpec bool) *unstruct
 // SetupWithManager sets up the controller with the Manager.
 func (r *DossierReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&streamflowv1.Dossier{}).
+		For(&dossierv1.Dossier{}).
 		Complete(r)
 }

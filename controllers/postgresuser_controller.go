@@ -24,7 +24,7 @@ import (
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/extra/bundebug"
-	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
+	dossierv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,7 +39,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-var finalizer = streamflowv1.GroupVersion.Group + "/finalizer"
+var finalizer = dossierv1.GroupVersion.Group + "/finalizer"
 var logger logr.Logger
 var dsnProtocolRegex = regexp.MustCompile(`^(postgresql)([^:]*)`)
 
@@ -63,9 +63,9 @@ type User struct {
 	EncryptedAuthState []byte         `bun:"encrypted_auth_state,notnull"`
 }
 
-//+kubebuilder:rbac:groups=streamflow.edu.unito.it,resources=postgresusers,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=streamflow.edu.unito.it,resources=postgresusers/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=streamflow.edu.unito.it,resources=postgresusers/finalizers,verbs=update
+//+kubebuilder:rbac:groups=dossier.di.unito.it,resources=postgresusers,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=dossier.di.unito.it,resources=postgresusers/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=dossier.di.unito.it,resources=postgresusers/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -76,7 +76,7 @@ func (r *PostgresUserReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	logger = r.Log.WithValues("postgresUser", req.NamespacedName)
 
 	// Fetch the PostgresUser instance
-	dbUser := &streamflowv1.PostgresUser{}
+	dbUser := &dossierv1.PostgresUser{}
 	err := r.Get(ctx, req.NamespacedName, dbUser)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -110,7 +110,7 @@ func (r *PostgresUserReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func (r *PostgresUserReconciler) addUserIfNotExists(ctx context.Context, dbUser *streamflowv1.PostgresUser) error {
+func (r *PostgresUserReconciler) addUserIfNotExists(ctx context.Context, dbUser *dossierv1.PostgresUser) error {
 	dossier, err := r.getDossier(ctx, types.NamespacedName{Namespace: dbUser.Namespace, Name: dbUser.Spec.Dossier})
 	if err != nil {
 		return err
@@ -145,8 +145,8 @@ func (r *PostgresUserReconciler) addUserIfNotExists(ctx context.Context, dbUser 
 	return err
 }
 
-func (r *PostgresUserReconciler) getDossier(ctx context.Context, dossierName types.NamespacedName) (*streamflowv1.Dossier, error) {
-	dossier := &streamflowv1.Dossier{}
+func (r *PostgresUserReconciler) getDossier(ctx context.Context, dossierName types.NamespacedName) (*dossierv1.Dossier, error) {
+	dossier := &dossierv1.Dossier{}
 	err := r.Get(ctx, dossierName, dossier)
 	if err != nil {
 		logger.Error(err, "Failed to get Dossier named: "+dossierName.String())
@@ -155,10 +155,11 @@ func (r *PostgresUserReconciler) getDossier(ctx context.Context, dossierName typ
 	return dossier, nil
 }
 
-func (r *PostgresUserReconciler) connectToDb(dossier *streamflowv1.Dossier) (*bun.DB, error) {
+func (r *PostgresUserReconciler) connectToDb(dossier *dossierv1.Dossier) (*bun.DB, error) {
 	//connectionString := "postgres://jhub@localhost:5432/jhubdb"
-	connectionString := getValueByKey("hub.db.url", dossier.Spec.Jhub.UnstructuredContent()).(string)
-	password := getValueByKey("hub.db.password", dossier.Spec.Jhub.UnstructuredContent()).(string)
+	jhub := dossier.Spec.Jhub.UnstructuredContent()
+	connectionString := getValueByKey("hub.db.url", jhub).(string)
+	password := getValueByKey("hub.db.password", jhub).(string)
 
 	sqldb := sql.OpenDB(pgdriver.NewConnector(
 		pgdriver.WithDSN(sanitizeDsn(connectionString)),
@@ -187,7 +188,7 @@ func sanitizeDsn(dsn string) string {
 	return dsnProtocolRegex.ReplaceAllString(dsn, "$1")
 }
 
-func getUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) (*User, error) {
+func getUser(ctx context.Context, db *bun.DB, dbUser *dossierv1.PostgresUser) (*User, error) {
 	user := &User{}
 	err := db.
 		NewSelect().
@@ -198,7 +199,7 @@ func getUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser)
 	return user, err
 }
 
-func (r *PostgresUserReconciler) addUser(ctx context.Context, db *bun.DB, dbUser *streamflowv1.PostgresUser) error {
+func (r *PostgresUserReconciler) addUser(ctx context.Context, db *bun.DB, dbUser *dossierv1.PostgresUser) error {
 	user := &User{
 		Name:         dbUser.Spec.Username,
 		Admin:        dbUser.Spec.IsAdmin,
@@ -233,7 +234,7 @@ func deleteUser(ctx context.Context, db *bun.DB, username string) error {
 	return err
 }
 
-func (r *PostgresUserReconciler) addFinalizer(ctx context.Context, dbUser *streamflowv1.PostgresUser) (ctrl.Result, error) {
+func (r *PostgresUserReconciler) addFinalizer(ctx context.Context, dbUser *dossierv1.PostgresUser) (ctrl.Result, error) {
 	if !controllerutil.ContainsFinalizer(dbUser, finalizer) {
 		controllerutil.AddFinalizer(dbUser, finalizer)
 		err := r.Update(ctx, dbUser)
@@ -244,7 +245,7 @@ func (r *PostgresUserReconciler) addFinalizer(ctx context.Context, dbUser *strea
 	return ctrl.Result{}, nil
 }
 
-func (r *PostgresUserReconciler) handleDeletion(ctx context.Context, dbUser *streamflowv1.PostgresUser, log logr.Logger) (ctrl.Result, error) {
+func (r *PostgresUserReconciler) handleDeletion(ctx context.Context, dbUser *dossierv1.PostgresUser, log logr.Logger) (ctrl.Result, error) {
 	if controllerutil.ContainsFinalizer(dbUser, finalizer) {
 		// Run finalization logic for finalizer. If the
 		// finalization logic fails, don't remove the finalizer so
@@ -264,7 +265,7 @@ func (r *PostgresUserReconciler) handleDeletion(ctx context.Context, dbUser *str
 	return ctrl.Result{}, nil
 }
 
-func (r *PostgresUserReconciler) finalizePostrgresUser(ctx context.Context, log logr.Logger, dbUser *streamflowv1.PostgresUser) error {
+func (r *PostgresUserReconciler) finalizePostrgresUser(ctx context.Context, log logr.Logger, dbUser *dossierv1.PostgresUser) error {
 	dossier, err := r.getDossier(ctx, types.NamespacedName{dbUser.Namespace, dbUser.Spec.Dossier})
 	if err != nil {
 		return err
@@ -282,6 +283,6 @@ func (r *PostgresUserReconciler) finalizePostrgresUser(ctx context.Context, log 
 // SetupWithManager sets up the controller with the Manager.
 func (r *PostgresUserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&streamflowv1.PostgresUser{}).
+		For(&dossierv1.PostgresUser{}).
 		Complete(r)
 }

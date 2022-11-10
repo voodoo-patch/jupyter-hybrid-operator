@@ -1,0 +1,40 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: jupyter-hybrid-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions: {}
+  description: Automates JupyterHub and Postgresql provisioning
+  displayName: JupyterHub operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - jupyterhub
+  - dossier
+  - dossier
+  links:
+  - name: Jupyter Hybrid Operator
+    url: https://jupyter-hybrid-operator.domain
+  maturity: alpha
+  provider:
+    name: dossier
+  version: 0.0.0

@@ -5,7 +5,7 @@ metadata:
   name: jupyterhub-viewer-role
 rules:
 - apiGroups:
-  - streamflow.edu.unito.it
+  - dossier.di.unito.it
   resources:
   - jupyterhubs
   verbs:
@@ -13,7 +13,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - streamflow.edu.unito.it
+  - dossier.di.unito.it
   resources:
   - jupyterhubs/status
   verbs:

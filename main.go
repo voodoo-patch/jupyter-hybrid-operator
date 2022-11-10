@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	streamflowv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
+	dossierv1 "github.com/voodoo-patch/jupyter-hybrid-operator/api/v1"
 	"github.com/voodoo-patch/jupyter-hybrid-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -51,7 +51,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(streamflowv1.AddToScheme(scheme))
+	utilruntime.Must(dossierv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -68,7 +68,7 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.StringVar(&watchesPath, "watches-file", "watches.yaml", "path to watches file")
-	flag.StringVar(&leaderElectionID, "leader-election-id", "d6864291.edu.unito.it", "provide leader election")
+	flag.StringVar(&leaderElectionID, "leader-election-id", "d6864291.di.unito.it", "provide leader election")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")

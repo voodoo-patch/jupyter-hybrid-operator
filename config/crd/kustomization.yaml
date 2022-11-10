@@ -2,8 +2,8 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/streamflow.edu.unito.it_jupyterhubs.yaml
-- bases/streamflow.edu.unito.it_dossiers.yaml
-- bases/streamflow.edu.unito.it_postgresqls.yaml
-- bases/streamflow.edu.unito.it_postgresusers.yaml
+- bases/dossier.di.unito.it_jupyterhubs.yaml
+- bases/dossier.di.unito.it_dossiers.yaml
+- bases/dossier.di.unito.it_postgresqls.yaml
+- bases/dossier.di.unito.it_postgresusers.yaml
 #+kubebuilder:scaffold:crdkustomizeresource

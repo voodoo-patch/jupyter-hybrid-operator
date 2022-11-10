@@ -5,7 +5,7 @@ metadata:
   name: jupyterhub-editor-role
 rules:
 - apiGroups:
-  - streamflow.edu.unito.it
+  - dossier.di.unito.it
   resources:
   - jupyterhubs
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - streamflow.edu.unito.it
+  - dossier.di.unito.it
   resources:
   - jupyterhubs/status
   verbs:

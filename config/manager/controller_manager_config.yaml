@@ -8,4 +8,4 @@ webhook:
   port: 9443
 leaderElection:
   leaderElect: true
-  resourceName: d6864291.edu.unito.it
+  resourceName: d6864291.di.unito.it
